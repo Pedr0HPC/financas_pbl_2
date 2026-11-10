@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/finance_models.dart';
@@ -26,9 +27,11 @@ class SqliteStore implements LocalStore {
 
   Future<Database> get database async {
     if (_db != null) return _db!;
-    final base = await getDatabasesPath();
+    final databasePath = kIsWeb
+        ? 'financas_ap2b.db'
+        : join(await getDatabasesPath(), 'financas_ap2b.db');
     _db = await openDatabase(
-      join(base, 'financas_ap2b.db'),
+      databasePath,
       version: 1,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {

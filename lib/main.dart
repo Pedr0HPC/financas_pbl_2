@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:sqflite/sqflite.dart' show databaseFactory;
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'
+    show databaseFactoryFfiWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'controllers/finance_controller.dart';
@@ -14,6 +18,9 @@ import 'screens/extra_screens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    databaseFactory = databaseFactoryFfiWeb;
+  }
   final client = http.Client();
   final controller = FinanceController(FinanceRepository(
       local: SqliteStore(), remote: HttpFinanceApi(client: client)));
