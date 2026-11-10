@@ -1,122 +1,153 @@
 # Finanças PBL — AP2B (Tema 06)
 
-**Computação Móvel • Faculdade Multivix • Sistemas de Informação • 2026/2**  
+**Computação Móvel | Faculdade Multivix | Sistemas de Informação | 2026/2**  
 **Professor:** Edgard da Cunha Pontes  
+**Grupo:** 9  
 **Tema 06:** Controle Financeiro e Orçamentário
 
-## Integrantes (mesma equipe da AP1B)
+## Integrantes
 
 - Caio Rohr Vargas Ribeiro
 - João Eduardo Herculano Galito
 - João Lucas Rodrigues Almeida
 - Pedro Henrique de Paula Caetano
 
-**Número do grupo:** Grupo 9 - Tema 06.
+## Objetivo e continuidade da AP1B
 
-## Contexto / continuidade do Marco 1
+O projeto dá continuidade ao [Finanças PBL — AP1B](https://github.com/Pedr0HPC/financas_pbl), originalmente desenvolvido em Dart. A AP2B evolui as regras de receitas, despesas, categorias, metas e simulação de juros compostos para uma aplicação Flutter, com formulários, navegação, persistência SQLite, consumo de API REST e testes automatizados.
 
-O [repositório original da AP1B](https://github.com/Pedr0HPC/financas_pbl) criou, em Dart puro, regras para receitas, despesas, categorias, metas de economia e simulação de juros compostos. A AP2B evolui esses **conceitos de negócio** para uma interface Flutter, com modelos serializáveis em `lib/models`, regras puras em `lib/domain`, persistência SQLite e uma camada Repository. A implementação desta entrega **reestrutura/reimplementa** partes da API de domínio anterior; não é uma cópia byte a byte dos arquivos da AP1B.
-
-Mudanças: valores monetários agora são registrados em **centavos inteiros** para evitar erros de arredondamento; receitas somam e despesas subtraem o saldo; categorizações, metas e simulação permanecem disponíveis. O saldo é calculado a partir dos lançamentos ativos persistidos localmente. Por ser um registro financeiro, **saldo negativo é permitido** quando despesas superam receitas; isso é uma decisão de adaptação em relação à regra de saldo insuficiente da AP1B, que deve ser explicada na defesa.
+A lógica da AP1B foi **adaptada e parcialmente reimplementada**, não simplesmente copiada. Para evitar problemas de precisão em cálculos financeiros, lançamentos monetários são armazenados em **centavos inteiros**. Receitas aumentam o saldo e despesas o reduzem. O saldo pode ficar negativo, decisão de projeto diferente da regra de saldo insuficiente da primeira etapa.
 
 ## Funcionalidades
 
-- Dashboard com saldo, totais de receitas/despesas e pendências.
-- CRUD local de lançamentos (inclusão, consulta, edição e exclusão lógica).
-- Cadastro e edição de categorias e respectivos limites orçamentários.
-- Metas financeiras com valor-alvo, acumulado e prazo.
-- Relatório de despesas por categoria e indicação de orçamento excedido.
-- Simulação de juros compostos, sem alterar dados reais.
-- Consulta assíncrona USD/BRL e EUR/BRL via **AwesomeAPI** e cache no SQLite.
-- Envio demonstrativo de registros pendentes (POST/PUT/DELETE) ao JSONPlaceholder.
-- Estado visual por lançamento (ícone de nuvem) e logs de sincronização.
-- Aplicação funciona sem internet para todos os formulários e consultas locais.
+- **Dashboard:** saldo, total de receitas, despesas e registros pendentes.
+- **Lançamentos:** cadastro, consulta, edição e exclusão lógica (*tombstone*).
+- **Categorias:** cadastro, edição e limites orçamentários.
+- **Metas:** valor-alvo, total acumulado e prazo.
+- **Relatórios:** agrupamento de despesas por categoria e indicação de orçamento excedido.
+- **Simulador:** projeção de juros compostos, sem alterar lançamentos reais.
+- **Cotações:** consulta de USD/BRL e EUR/BRL pela AwesomeAPI, com cache SQLite.
+- **Sincronização demonstrativa:** envio de pendências por HTTP para a JSONPlaceholder e histórico local de tentativas.
+- **Funcionamento offline:** leitura e alterações de dados financeiros no banco local sem depender de rede.
 
-## 14 rotas navegáveis
+## Navegação — 14 rotas
 
 | Rota | Função |
 |---|---|
 | `/` | Dashboard |
-| `/lancamentos` | Lista de lançamentos com Dismissible |
-| `/novo` | Cadastro validado |
-| `/editar` | Edição validada (argumento: Lancamento) |
-| `/detalhes` | Detalhes (argumento: Lancamento) |
-| `/categorias` | Lista de categorias |
-| `/nova-categoria` | Cadastro/edição de categoria |
-| `/metas` | Lista de metas |
-| `/nova-meta` | Cadastro/edição de meta |
+| `/lancamentos` | Listagem de lançamentos |
+| `/novo` | Cadastro de lançamento |
+| `/editar` | Edição de lançamento (argumento `Lancamento`) |
+| `/detalhes` | Detalhes de lançamento (argumento `Lancamento`) |
+| `/categorias` | Listagem de categorias |
+| `/nova-categoria` | Cadastro e edição de categoria |
+| `/metas` | Listagem de metas |
+| `/nova-meta` | Cadastro e edição de meta |
 | `/relatorios` | Relatórios por categoria |
-| `/cotacoes` | Cotações com cache |
+| `/cotacoes` | Consulta e cache de cotações |
 | `/sincronizacao` | Diagnóstico e envio de pendências |
 | `/simulador` | Juros compostos |
-| `/configuracoes` | Informações e políticas do projeto |
+| `/configuracoes` | Informações do aplicativo |
 
-O roteamento usa `onGenerateRoute` com validação do tipo dos argumentos. Widgets incluem `Scaffold`, `AppBar`, `ListView.builder`, `Dismissible`, `Form`, `GlobalKey<FormState>`, `TextEditingController`, `TextFormField`, `SnackBar` e Material Design 3.
+O aplicativo usa Material Design 3, `Scaffold`, `AppBar`, `ListView.builder`, `Dismissible`, `Form`, `GlobalKey<FormState>`, `TextEditingController`, `TextFormField` e `SnackBar`. As rotas são definidas em `onGenerateRoute`, com verificação de argumentos.
 
 ## Arquitetura Offline-First
 
 ```mermaid
 flowchart TB
-    UI[Flutter: 14 rotas, Material 3, Controller]
-    R[FinanceRepository: orquestra operações]
-    DB[LocalStore: SQLite / sqflite]
-    A[RemoteFinanceApi: package:http]
-    FX[AwesomeAPI GET - cotação]
-    MOCK[JSONPlaceholder POST/PUT/DELETE - mock]
-    UI -->|leitura e escrita| R
-    R -->|sempre primeiro| DB
-    R -->|apenas sob comando| A
-    A --> FX
-    A --> MOCK
-    R -->|dados da UI vêm do banco local| UI
+    UI[Flutter: telas e controller]
+    REPO[FinanceRepository]
+    DB[SQLite local: SqliteStore]
+    API[HttpFinanceApi: HTTP e JSON]
+    FX[AwesomeAPI: GET cotacoes]
+    MOCK[JSONPlaceholder: POST PUT DELETE]
+    UI --> REPO
+    REPO -->|leitura e escrita prioritarias| DB
+    REPO -->|sincronizacao solicitada| API
+    API --> FX
+    API --> MOCK
 ```
 
-**Single Source of Truth:** a interface sempre lê dados financeiros do SQLite. Cadastro/edição/exclusão alteram o banco antes de qualquer requisição externa; cada movimento inicia com `sincronizado = 0`. A exclusão utiliza marcador `excluido = 1` (tombstone), permitindo sincronizar o DELETE posteriormente. Em caso de falha HTTP, o registro continua pendente. O envio bem-sucedido atualiza o indicador **somente se a revisão local ainda for a mesma**, evitando que uma alteração simultânea seja marcada como sincronizada indevidamente.
+O **SQLite é a fonte única da verdade (*Single Source of Truth*)** da interface: todas as consultas, inclusões, alterações e exclusões locais passam pelo repositório e são persistidas antes do envio à rede. Novos lançamentos ou alterações ficam com `sincronizado = 0` até que o serviço HTTP retorne uma resposta considerada válida.
 
-A API JSONPlaceholder retorna sucesso **simulado**: ela não persiste os lançamentos do grupo e **não pode ser utilizada como backup real**. Portanto, o ícone representa *envio aceito pelo endpoint de demonstração*, não garantia de cópia remota. Para um produto real, substituir por backend próprio que forneça autenticação, identificadores estáveis, consistência e resolução de conflitos.
+A exclusão é lógica (`excluido = 1`), permitindo enviar posteriormente a operação `DELETE`. Caso haja falha de rede ou erro HTTP, a pendência permanece armazenada. A confirmação verifica o ID e a revisão do registro para não marcar como sincronizada uma versão modificada durante o envio.
 
-## Endpoints usados
+**Limitação importante:** a JSONPlaceholder **não persiste** os lançamentos financeiros enviados. O status sincronizado indica **aceitação demonstrativa da requisição**, não backup em servidor. Não há banco remoto próprio nesta entrega. Uma versão de produção exigiria autenticação, armazenamento remoto real, recuperação via GET e resolução de conflitos.
 
-| Serviço | Endpoint | Operação | Finalidade |
+## APIs utilizadas
+
+| Serviço | Endpoint | Método | Finalidade |
 |---|---|---|---|
-| AwesomeAPI | `https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL` | GET | Buscar USD/BRL e EUR/BRL |
-| JSONPlaceholder | `https://jsonplaceholder.typicode.com/posts` | POST | Demonstrar envio de novo lançamento |
-| JSONPlaceholder | `https://jsonplaceholder.typicode.com/posts/1` | PUT | Demonstrar edição de lançamento |
-| JSONPlaceholder | `https://jsonplaceholder.typicode.com/posts/1` | DELETE | Demonstrar exclusão |
+| AwesomeAPI | `https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL` | GET | Buscar cotações |
+| JSONPlaceholder | `https://jsonplaceholder.typicode.com/posts` | POST | Simular inclusão remota |
+| JSONPlaceholder | `https://jsonplaceholder.typicode.com/posts/1` | PUT | Simular atualização remota |
+| JSONPlaceholder | `https://jsonplaceholder.typicode.com/posts/1` | DELETE | Simular exclusão remota |
 
-`http.Client`, `Future`, `async/await`, `dart:convert`, validação de HTTP 2xx e `.timeout(Duration(seconds: 5))` estão em `lib/datasources/remote_api.dart`.
+A integração HTTP está em `lib/datasources/remote_api.dart`, com `package:http`, `Future`, `async/await`, serialização JSON, verificação de códigos de status e limite de tempo para requisições.
 
-## Como executar (Windows, Android Studio ou VS Code)
+## Plataformas disponíveis
 
-1. Instalar **Flutter SDK**, **Android Studio** (com SDK/Emulador) e extensões Flutter/Dart da IDE.
-2. No terminal na **raiz do projeto** (onde está `pubspec.yaml`), executar:
+- **Android:** pasta `android/` já gerada e versionada. O workflow do GitHub Actions executa a compilação de um APK de depuração.
+- **Web:** pasta `web/` já incluída para apresentação pelo navegador. A versão Web usa `sqflite_common_ffi_web` e os arquivos `sqlite3.wasm` e `sqflite_sw.js` para SQLite no navegador.
 
-   ```bash
-   flutter doctor
-   flutter create --project-name financas_pbl_ap2b --platforms=android .
-   flutter pub get
-   flutter test
-   flutter run
-   ```
+O suporte Web é uma **alternativa de demonstração**. A entrega principal da disciplina permanece sendo o aplicativo Flutter com plataforma Android. O armazenamento Web depende do navegador, do perfil e da origem (URL/porta) acessada; não compartilha automaticamente o banco com o Android.
 
-   O pacote contém o código Flutter e arquivos de configuração do projeto, mas **não inclui a pasta `android/` gerada pelo Flutter SDK**. O comando `flutter create` cria os arquivos de plataforma necessários sem exigir que eles sejam escritos manualmente. Para iOS, no macOS com Xcode, gerar também `--platforms=ios`.
+## Execução no GitHub Codespaces — navegador
 
-3. No arquivo `android/app/src/main/AndroidManifest.xml`, garantir esta permissão **antes** da tag `<application>`:
+No terminal do Codespaces, na pasta que contém `pubspec.yaml`:
 
-   ```xml
-   <uses-permission android:name="android.permission.INTERNET" />
-   ```
+```bash
+cd /workspaces/financas_pbl_2
+flutter --version
+flutter pub get
+flutter analyze
+flutter test
+```
 
-4. Selecionar emulador Android ou dispositivo físico conectado. `flutter devices` lista as opções.
-5. Ativar/desativar modo avião para demonstrar **cadastro e consulta locais**. Desativar modo avião e ir em *Sincronização > Sincronizar agora* para enviar pendências ao mock.
+Com a análise e os testes aprovados, execute:
 
-No Windows, também há um script `bootstrap_android.ps1` que automatiza os passos de criação dos arquivos Android e inclusão da permissão de internet. Execute após conferir o conteúdo do script.
+```bash
+flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080
+```
 
-**O projeto foi preparado, mas Flutter SDK e emulador não estão disponíveis no ambiente em que os arquivos foram gerados.** Portanto `flutter pub get`, `flutter analyze`, `flutter test` e `flutter run` **não foram executados ou validados aqui**. Execute-os antes de entregar; um workflow de GitHub Actions está incluído para auxiliar na validação.
+Na interface do Codespaces, abra a aba **PORTS**, localize a porta **8080** e escolha **Open in Browser**. **Mantenha o terminal do servidor em execução** enquanto apresenta o sistema. Para encerrar, use `Ctrl+C`.
 
-## Testes
+Se ocorrer erro relacionado aos recursos SQLite Web, confira a presença de `web/sqlite3.wasm` e `web/sqflite_sw.js`. Somente se estiverem ausentes, execute:
 
-Os arquivos em `test/` contêm **50 casos de unidade** (`domain_test.dart`: 30; `repository_test.dart`: 13; `remote_api_test.dart`: 7) e **10 casos de widget** (`widgets_test.dart`: 10), para atender aos mínimos de 20 e 5. Usam `flutter_test` (`group`, `test`, `expect`, `throws...`, `testWidgets`, `pumpWidget`, `tester.tap`, `find.text`) com injeção de dependência, fake de SQLite e fake de rede. A existência dos testes **não substitui comprovação de execução com sucesso**.
+```bash
+dart run sqflite_common_ffi_web:setup
+```
+
+O carregamento inicial exige acesso ao Codespaces. Com a página já aberta, o DevTools do navegador pode simular a perda de conectividade, mas isso **não comprova** que o aplicativo pode ser carregado do zero sem rede. Requisições da AwesomeAPI também podem ser limitadas por CORS no navegador.
+
+## Execução Android
+
+Para compilar ou executar Android localmente, instale o Flutter SDK e o Android SDK. Como a pasta `android/` **já existe**, não é necessário executar `flutter create` novamente.
+
+```bash
+flutter doctor -v
+flutter pub get
+flutter devices
+flutter run -d <id-do-dispositivo-android>
+```
+
+Confira se `android/app/src/main/AndroidManifest.xml` possui a permissão de internet:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+```
+
+Se o computador não tiver SDK Android, use o GitHub Actions para a compilação. O workflow está em `.github/workflows/flutter.yml` e executa `flutter pub get`, `flutter analyze`, `flutter test` e `flutter build apk --debug`. Quando aprovado, o APK está disponível na seção **Artifacts**, sob o nome `financas-pbl-ap2b-tema06-apk` (enquanto o artefato permanecer disponível no GitHub).
+
+[Consultar GitHub Actions do projeto](https://github.com/Pedr0HPC/financas_pbl_2/actions)
+
+## Testes e validação
+
+A suíte inclui **50 testes de unidade** (`domain_test.dart`: 30; `repository_test.dart`: 13; `remote_api_test.dart`: 7) e **10 testes de widgets** (`widgets_test.dart`: 10), totalizando **60 casos**, atendendo aos mínimos exigidos na AP2B.
+
+Os testes cobrem regras financeiras, serialização, situações de falha de rede e componentes visuais com dependências simuladas. O GitHub Actions teve uma execução bem-sucedida do fluxo de análise, testes e compilação Android na revisão `ba14e22`, em **10/11/2026**. Isso **não substitui** os testes manuais de banco SQLite Web, interação completa e integração HTTP no navegador da apresentação.
+
+Comandos para nova verificação:
 
 ```bash
 dart format lib test
@@ -125,26 +156,41 @@ flutter test
 flutter test --coverage
 ```
 
-## Estrutura do projeto
+## Demonstração sugerida para a defesa
+
+1. Abra o app no navegador pelo Codespaces e mostre o Dashboard.
+2. Cadastre uma receita de R$ 3.000,00 e uma despesa de R$ 200,00; confira saldo de R$ 2.800,00.
+3. Abra `F12` → **Network** → **Offline**, sem atualizar a página; cadastre uma nova despesa e mostre o indicador de pendência.
+4. Volte a **No throttling**, abra **Sincronização** e solicite o envio de pendências.
+5. Em **Network**, observe requisições e respostas da JSONPlaceholder. Explique que são **simuladas e não representam backup remoto**.
+6. Mostre a tela de cotações e o cache, se as requisições estiverem disponíveis no navegador.
+7. Em outro terminal do Codespaces, execute `flutter test` e apresente o resultado.
+
+Para a demonstração com a rede desligada, não recarregue a página do aplicativo. Antes de apresentar, verifique se a URL encaminhada do Codespaces está acessível no computador da sala e se a tela de cadastro funciona nessa sessão.
+
+## Estrutura principal do projeto
 
 ```text
+.github/workflows/flutter.yml
+android/
+web/
 lib/
-  main.dart                     # inicialização e validação das rotas
-  models/finance_models.dart    # entidades toMap/fromMap e serialização
-  domain/finance_rules.dart     # regras Dart puras da AP1B adaptadas
-  datasources/local_store.dart  # contrato DAO + implementação sqflite
-  datasources/remote_api.dart   # HTTP, timeouts e JSON
+  main.dart
+  models/finance_models.dart
+  domain/finance_rules.dart
+  datasources/local_store.dart
+  datasources/remote_api.dart
   repositories/finance_repository.dart
   controllers/finance_controller.dart
-  screens/                     # telas e formulários
-  widgets/app_shell.dart       # Scaffold, drawer e feedback
- test/
-  helpers/fakes.dart            # doubles de banco e HTTP
+  screens/
+  widgets/app_shell.dart
+test/
+  helpers/fakes.dart
   domain_test.dart
   repository_test.dart
   remote_api_test.dart
   widgets_test.dart
- docs/
+docs/
   ARQUITETURA.md
   ROTEIRO_DEMONSTRACAO.md
   PERGUNTAS_DEFESA.md
@@ -152,26 +198,31 @@ lib/
   CONTINUIDADE_AP1B.md
   EMAIL_ENTREGA.md
   PUBLICAR_GITHUB.md
+pubspec.yaml
+pubspec.lock
+README.md
 ```
 
-## Declaração de Uso de Inteligência Artificial
+## Declaração de uso de Inteligência Artificial
 
-Na **AP1B**, o README do repositório anterior informa o uso do **Gemini** como apoio para estruturação, sintaxe, depuração e documentação. Na produção desta **proposta de AP2B**, houve auxílio do **ChatGPT (OpenAI, GPT-6)** para análise do enunciado, reestruturação de código Flutter/Dart, propostas de testes, documentação e roteiro de defesa.
+Na AP1B, conforme a documentação original do grupo, foi utilizado o **Gemini** como apoio à estruturação, sintaxe, depuração e documentação. Na AP2B, o **ChatGPT (OpenAI)** foi utilizado como apoio para interpretar o enunciado, propor e revisar trechos Flutter/Dart, auxiliar na correção de erros, elaborar cenários de testes e produzir documentação e roteiro de defesa. O grupo é responsável por executar, verificar, compreender e explicar o código entregue, inclusive durante modificações solicitadas na avaliação presencial.
 
-## Como submeter
+## Entrega
 
-- Criar um **novo** repositório GitHub e subir os arquivos desta pasta, depois de gerar/validar a plataforma Android e ajustar o número do grupo.
-- Enviar o **link**, não apenas o arquivo ZIP, para `edgardpontes@professor.multivix.edu.br` até **12/11/2026**.
-- Assunto: **`[AP2B - Computação Móvel] - Tema 06 - Grupo [Número do Grupo]`**.
-- Defesa presencial prevista para **10/11/2026**. A nota da entrevista é individual. Cada integrante deve ser capaz de explicar e alterar o código.
+- **Repositório:** https://github.com/Pedr0HPC/financas_pbl_2
+- **Prazo do link:** 12/11/2026.
+- **E-mail:** edgardpontes@professor.multivix.edu.br
+- **Assunto:** `[AP2B - Computação Móvel] - Tema 06 - Grupo 9`
+- **Defesa técnica:** prevista no enunciado para 10/11/2026, com avaliação individual de domínio do código e da arquitetura.
 
 ## Referências
 
-- [Repositório AP1B — Pedr0HPC/financas_pbl](https://github.com/Pedr0HPC/financas_pbl)
+- [Repositório AP1B — Finanças PBL](https://github.com/Pedr0HPC/financas_pbl)
 - [Documentação oficial Flutter](https://docs.flutter.dev/)
 - [Documentação oficial Dart](https://dart.dev/language)
-- [sqflite no pub.dev](https://pub.dev/packages/sqflite)
-- [package:http no pub.dev](https://pub.dev/packages/http)
-- [AwesomeAPI - Cotações](https://docs.awesomeapi.com.br/api-de-moedas)
-- [JSONPlaceholder - Guide](https://jsonplaceholder.typicode.com/guide/)
-- MULTIVIX. Computação Móvel: Avaliação Processual 2B — 2026/2.
+- [sqflite](https://pub.dev/packages/sqflite)
+- [sqflite_common_ffi_web](https://pub.dev/packages/sqflite_common_ffi_web)
+- [package:http](https://pub.dev/packages/http)
+- [AwesomeAPI — documentação de moedas](https://docs.awesomeapi.com.br/api-de-moedas)
+- [JSONPlaceholder — Guide](https://jsonplaceholder.typicode.com/guide/)
+- MULTIVIX. *Computação Móvel: Avaliação Processual 2B — 2026/2*.
